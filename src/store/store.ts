@@ -1,15 +1,19 @@
 import type {
+  AirworthinessSignature,
   AuditRecord,
   CertificateRecord,
   CoreReturn,
   CustomsDeclaration,
   InstalledPart,
   LedgerEntry,
+  MaintenanceReleaseRecord,
   OutboxMessage,
   PartStock,
   Reservation,
   WorkOrder,
   ExternalEvent,
+  MaintenanceTaskCard,
+  IndependentInspection,
 } from '../domain/types.js';
 
 class Mutex {
@@ -63,7 +67,8 @@ export class Store {
   addLedger(entry: Omit<LedgerEntry, 'id' | 'createdAt'>): void {
     this.ledger.push({ ...entry, id: this.nextId('ledger'), createdAt: this.now() });
   }
-  readonly taskCards = new Map<string, import('../domain/types.js').MaintenanceTaskCard>();
-  readonly inspections = new Map<string, import('../domain/types.js').IndependentInspection>();
-  readonly airworthinessSignatures = new Map<string, { workOrderId: string; signer: string; valid: boolean; signedAt: string }>();
+  readonly taskCards = new Map<string, MaintenanceTaskCard>();
+  readonly inspections = new Map<string, IndependentInspection>();
+  readonly airworthinessSignatures = new Map<string, AirworthinessSignature>();
+  readonly maintenanceReleases = new Map<string, MaintenanceReleaseRecord>();
 }
