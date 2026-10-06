@@ -1,4 +1,5 @@
 import type {
+  AirworthinessSignature,
   AuditRecord,
   CertificateRecord,
   CoreReturn,
@@ -52,18 +53,45 @@ export class Store {
     return new Date().toISOString();
   }
 
-  addAudit(tenantId: string, action: string, entity: string, entityId: string, metadata: Record<string, string | number | boolean> = {}): void {
-    this.audit.push({ id: this.nextId('audit'), tenantId, action, entity, entityId, metadata, createdAt: this.now() });
+  addAudit(tenantId: string, action: string, entity: string, entityId: string, metadata: Record<string, string | number | boolean> = {}): string {
+    const id = this.nextId('audit');
+    this.audit.push({ id, tenantId, action, entity, entityId, metadata, createdAt: this.now() });
+    return id;
   }
 
-  addOutbox(tenantId: string, topic: string, aggregateId: string, payload: unknown): void {
-    this.outbox.push({ id: this.nextId('outbox'), tenantId, topic, aggregateId, payload: JSON.stringify(payload), status: 'PENDING', createdAt: this.now() });
+  addOutbox(tenantId: string, topic: string, aggregateId: string, payload: unknown): string {
+    const id = this.nextId('outbox');
+    this.outbox.push({ id, tenantId, topic, aggregateId, payload: JSON.stringify(payload), status: 'PENDING', createdAt: this.now() });
+    return id;
   }
 
   addLedger(entry: Omit<LedgerEntry, 'id' | 'createdAt'>): void {
     this.ledger.push({ ...entry, id: this.nextId('ledger'), createdAt: this.now() });
   }
+
+  /**
+   * Run `work` exclusively against the store. Audit/outbox/ledger writes made
+   * inside only survive if `work` returns; when it throws they are rolled back,
+   * so a failed state transition can never leave a half-written audit trail or
+   * Outbox message.
+   */
+  async transact<T>(work: () => T | Promise<T>): Promise<T> {
+    return this.lock.runExclusive(async () => {
+      const auditSize = this.audit.length;
+      const outboxSize = this.outbox.length;
+      const ledgerSize = this.ledger.length;
+      try {
+        return await work();
+      } catch (error) {
+        this.audit.length = auditSize;
+        this.outbox.length = outboxSize;
+        this.ledger.length = ledgerSize;
+        throw error;
+      }
+    });
+  }
+
   readonly taskCards = new Map<string, import('../domain/types.js').MaintenanceTaskCard>();
   readonly inspections = new Map<string, import('../domain/types.js').IndependentInspection>();
-  readonly airworthinessSignatures = new Map<string, { workOrderId: string; signer: string; valid: boolean; signedAt: string }>();
+  readonly airworthinessSignatures = new Map<string, AirworthinessSignature>();
 }

@@ -160,3 +160,18 @@ export interface IndependentInspection {
   required: boolean;
   status: 'PENDING' | 'PASSED' | 'FAILED';
 }
+
+export interface AirworthinessSignature {
+  id: string;
+  workOrderId: string;
+  signer: string;
+  valid: boolean;
+  signedAt: string;
+}
+
+export interface ReleaseResult {
+  workOrderId: string;
+  status: WorkOrderStatus;
+  outboxId: string;
+  alreadyReleased: boolean;
+}
